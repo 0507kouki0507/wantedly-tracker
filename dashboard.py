@@ -28,10 +28,20 @@ SCOPES = [
 @st.cache_resource(ttl=300)
 def get_client():
     if "gcp_service_account" in st.secrets:
-        import json
-        creds_dict = json.loads(json.dumps(dict(st.secrets["gcp_service_account"])))
-        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-        creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+        sa = st.secrets["gcp_service_account"]
+        creds = Credentials.from_service_account_info({
+            "type": sa["type"],
+            "project_id": sa["project_id"],
+            "private_key_id": sa["private_key_id"],
+            "private_key": sa["private_key"].replace("\\n", "\n"),
+            "client_email": sa["client_email"],
+            "client_id": sa["client_id"],
+            "auth_uri": sa["auth_uri"],
+            "token_uri": sa["token_uri"],
+            "auth_provider_x509_cert_url": sa["auth_provider_x509_cert_url"],
+            "client_x509_cert_url": sa["client_x509_cert_url"],
+            "universe_domain": sa.get("universe_domain", "googleapis.com"),
+        }, scopes=SCOPES)
     else:
         # ローカル実行時は credentials.json を使用
         from pathlib import Path
