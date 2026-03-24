@@ -28,9 +28,9 @@ SCOPES = [
 @st.cache_resource(ttl=300)
 def get_client():
     if "gcp_service_account" in st.secrets:
-        creds = Credentials.from_service_account_info(
-            st.secrets["gcp_service_account"], scopes=SCOPES
-        )
+        creds_dict = dict(st.secrets["gcp_service_account"])
+        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+        creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     else:
         # ローカル実行時は credentials.json を使用
         from pathlib import Path
