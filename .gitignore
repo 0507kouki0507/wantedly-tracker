@@ -1,0 +1,10 @@
+credentials.json
+data/
+__pycache__/
+*.pyc
+.env
+session.json
+*.db
+uv.lock
+.venv/
+.streamlit/secrets.toml
