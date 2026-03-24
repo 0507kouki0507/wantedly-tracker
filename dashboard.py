@@ -28,7 +28,8 @@ SCOPES = [
 @st.cache_resource(ttl=300)
 def get_client():
     if "gcp_service_account" in st.secrets:
-        creds_dict = dict(st.secrets["gcp_service_account"])
+        import json
+        creds_dict = json.loads(json.dumps(dict(st.secrets["gcp_service_account"])))
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
         creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     else:
