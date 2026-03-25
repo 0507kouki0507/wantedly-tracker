@@ -29,6 +29,7 @@ def get_client():
     if "gcp_credentials" in st.secrets:
         import json
         creds_dict = json.loads(st.secrets["gcp_credentials"])
+        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
         return gspread.service_account_from_dict(creds_dict, scopes=SCOPES)
     else:
         from pathlib import Path
