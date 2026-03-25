@@ -164,8 +164,24 @@ def main() -> None:
             boshu_list = _dedup(parse_boshu(boshu_text), "title")
             print(f"  {len(boshu_list)} 件取得（重複除去後）")
 
+            daily_records = []
+
             for a in boshu_list:
                 key = f"boshu::{a['title']}"
+                prev = db.get_last(conn, key)
+                daily_pv   = max(0, a["pv"]   - (prev["pv"]   if prev else 0))
+                daily_oubo = max(0, a["oubo"] - (prev["oubo"] if prev else 0))
+                daily_records.append({
+                    "article_type": "募集",
+                    "title":        a["title"],
+                    "status":       a["status"],
+                    "pv":           a["pv"],
+                    "oubo":         a["oubo"],
+                    "likes":        0,
+                    "daily_pv":     daily_pv,
+                    "daily_oubo":   daily_oubo,
+                    "daily_likes":  0,
+                })
                 db.save_history(conn, "募集", a["title"], a["status"],
                                 a["pv"], a["bookmark"], a["oubo"], a["ouen"], 0)
                 db.save_last(conn, key, a["pv"], a["bookmark"], a["oubo"], a["ouen"], 0)
@@ -178,6 +194,20 @@ def main() -> None:
 
             for a in story_list:
                 key = f"story::{a['title']}"
+                prev = db.get_last(conn, key)
+                daily_pv    = max(0, a["pv"]    - (prev["pv"]    if prev else 0))
+                daily_likes = max(0, a["likes"] - (prev["likes"] if prev else 0))
+                daily_records.append({
+                    "article_type": "ストーリー",
+                    "title":        a["title"],
+                    "status":       "",
+                    "pv":           a["pv"],
+                    "oubo":         0,
+                    "likes":        a["likes"],
+                    "daily_pv":     daily_pv,
+                    "daily_oubo":   0,
+                    "daily_likes":  daily_likes,
+                })
                 db.save_history(conn, "ストーリー", a["title"], "",
                                 a["pv"], 0, 0, 0, a["likes"])
                 db.save_last(conn, key, a["pv"], 0, 0, 0, a["likes"])
@@ -207,6 +237,9 @@ def main() -> None:
     oubo_data = {r["title"][:40]: r["oubo"]
                  for r in records if r["article_type"] == "募集"}
     sheets.update_pivot(ss, "応募推移", today, oubo_data, top_n=30)
+
+    # 日別サマリー（見やすいダッシュボードタブ）
+    sheets.update_daily_summary(ss, daily_records, today)
 
     # チャート（初回のみ作成）
     sheets.create_chart_if_needed(ss, "PV推移",   "PVグラフ",   "PV推移グラフ（上位30記事）")
