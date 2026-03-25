@@ -88,6 +88,18 @@ def get_article_history(conn: sqlite3.Connection, title: str) -> pd.DataFrame:
     return pd.DataFrame([dict(r) for r in rows])
 
 
+def get_all_history_by_day(conn: sqlite3.Connection) -> pd.DataFrame:
+    """日付×記事の累計値テーブルを返す（日別差分計算用）"""
+    rows = conn.execute("""
+        SELECT date(scraped_at) AS date, article_type, title, status,
+               MAX(pv) AS pv, MAX(oubo) AS oubo, MAX(likes) AS likes
+        FROM history
+        GROUP BY date(scraped_at), title
+        ORDER BY title, date ASC
+    """).fetchall()
+    return pd.DataFrame([dict(r) for r in rows])
+
+
 def get_all_latest(conn: sqlite3.Connection) -> pd.DataFrame:
     """各記事の最新スナップショットを返す"""
     rows = conn.execute("""

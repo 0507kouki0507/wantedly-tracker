@@ -398,6 +398,139 @@ def create_chart_if_needed(ss: Spreadsheet, pivot_sheet_name: str,
 #  ユーティリティ
 # ══════════════════════════════════════════
 
+def update_trend_pivot(ss: Spreadsheet, history_df, latest_records: list[dict]) -> None:
+    """記事別×日別の推移ピボットシートを作成・更新"""
+    import pandas as pd
+
+    ws = _get_or_add_ws(ss, "📈 記事別推移", rows=500, cols=100)
+    ws.clear()
+
+    if history_df.empty:
+        return
+
+    # 日付リスト（最新30日）
+    all_dates = sorted(history_df["date"].unique())[-30:]
+    short_dates = [d[5:].replace("-", "/") for d in all_dates]  # "03/25" 形式
+
+    # 記事ごとに日別PVを計算
+    pivot: dict[str, dict[str, int]] = {}
+    meta: dict[str, dict] = {}
+
+    for title, group in history_df.groupby("title"):
+        group = group.sort_values("date")
+        pvs = dict(zip(group["date"], group["pv"]))
+        oubo = dict(zip(group["date"], group["oubo"]))
+        likes = dict(zip(group["date"], group["likes"]))
+        row_meta = group.iloc[-1]
+        meta[title] = {
+            "article_type": row_meta["article_type"],
+            "status": row_meta["status"] or "",
+        }
+        daily: dict[str, int] = {}
+        prev_pv = 0
+        for d in all_dates:
+            cur = pvs.get(d, prev_pv)
+            daily[d] = max(0, cur - prev_pv)
+            prev_pv = cur if d in pvs else prev_pv
+        pivot[title] = daily
+
+    # ソート順：募集中 → ストーリー → 募集停止中、各グループ内は累計PV降順
+    latest_pv = {r["title"]: r["pv"] for r in latest_records}
+
+    def sort_key(title):
+        m = meta[title]
+        order = _status_order({"status": m["status"], "article_type": m["article_type"]})
+        return (order, -latest_pv.get(title, 0))
+
+    sorted_titles = sorted(pivot.keys(), key=sort_key)
+
+    # ヘッダー行
+    fixed_cols = ["種別", "タイトル", "状態"]
+    header = fixed_cols + short_dates
+    rows: list[list] = [header]
+
+    # セクション区切りとデータ行
+    sections = [
+        (0, "▼ 募集中"),
+        (1, "▼ ストーリー"),
+        (2, "▼ 募集停止中"),
+    ]
+    section_row_indices: dict[int, int] = {}  # section_order → row index
+
+    current_section = -1
+    for title in sorted_titles:
+        m = meta[title]
+        sec = _status_order({"status": m["status"], "article_type": m["article_type"]})
+        if sec != current_section:
+            current_section = sec
+            section_row_indices[sec] = len(rows)
+            label = next(lbl for s, lbl in sections if s == sec)
+            rows.append([label] + [""] * (len(header) - 1))
+        daily = pivot[title]
+        rows.append([
+            m["article_type"],
+            title,
+            m["status"],
+        ] + [daily.get(d, 0) for d in all_dates])
+
+    ws.update("A1", rows, value_input_option="USER_ENTERED")
+
+    # ── 書式設定 ──────────────────────────
+    reqs = []
+    sheet_id = ws.id
+    ncols = len(header)
+
+    # ヘッダー行
+    reqs.append(_fmt_req(sheet_id, 0, 1, 0, ncols,
+                         bg=COLOR_HEADER, bold=True, fg=COLOR_WHITE, halign="CENTER"))
+
+    # セクション見出し行
+    sec_bg = {"red": 0.3, "green": 0.3, "blue": 0.3}
+    for sec_order, label in sections:
+        if sec_order in section_row_indices:
+            ri = section_row_indices[sec_order]
+            reqs.append(_fmt_req(sheet_id, ri, ri + 1, 0, ncols,
+                                 bg=sec_bg, bold=True, fg=COLOR_WHITE))
+
+    # データ行の色分け
+    for i, row in enumerate(rows):
+        if i == 0:
+            continue
+        if not row[0] or row[0].startswith("▼"):
+            continue
+        article_type = row[0]
+        status = row[2] if len(row) > 2 else ""
+        if status == "募集停止中":
+            bg = COLOR_STOPPED
+        elif article_type == "ストーリー":
+            bg = COLOR_STORY
+        else:
+            bg = COLOR_BOSHU
+        reqs.append(_fmt_req(sheet_id, i, i + 1, 0, ncols, bg=bg))
+
+    # 列幅調整
+    reqs += [
+        _col_width(sheet_id, 0, 1, 80),   # 種別
+        _col_width(sheet_id, 1, 2, 300),  # タイトル
+        _col_width(sheet_id, 2, 3, 90),   # 状態
+    ]
+    for ci in range(3, ncols):
+        reqs.append(_col_width(sheet_id, ci, ci + 1, 55))  # 日付列
+
+    # 先頭1行・3列固定
+    reqs.append({"updateSheetProperties": {
+        "properties": {"sheetId": sheet_id,
+                        "gridProperties": {"frozenRowCount": 1,
+                                           "frozenColumnCount": 3}},
+        "fields": "gridProperties.frozenRowCount,gridProperties.frozenColumnCount",
+    }})
+
+    if reqs:
+        ss.batch_update({"requests": reqs})
+
+    print(f"  記事別推移更新: {len(sorted_titles)} 記事 × {len(all_dates)} 日")
+
+
 def delete_unused_sheets(ss: Spreadsheet) -> None:
     """不要なタブを削除する"""
     to_delete = ["PV推移", "応募推移", "PVグラフ", "応募グラフ"]

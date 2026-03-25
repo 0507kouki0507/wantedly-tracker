@@ -237,6 +237,10 @@ def main() -> None:
     # 縦持ち日別データ（全履歴・ピボット用）
     sheets.update_tall_data(ss, daily_records, today)
 
+    # 記事別×日別推移ピボット
+    history_df = db.get_all_history_by_day(conn)
+    sheets.update_trend_pivot(ss, history_df, records)
+
     # 日別サマリー（見やすいダッシュボードタブ）
     sheets.update_daily_summary(ss, daily_records, today)
 
