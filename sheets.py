@@ -531,6 +531,118 @@ def update_trend_pivot(ss: Spreadsheet, history_df, latest_records: list[dict]) 
     print(f"  記事別推移更新: {len(sorted_titles)} 記事 × {len(all_dates)} 日")
 
 
+def update_guide_sheet(ss: Spreadsheet) -> None:
+    """使い方ガイドシートを作成・更新する"""
+    ws = _get_or_add_ws(ss, "📖 使い方ガイド", rows=60, cols=6)
+    ws.clear()
+
+    C_TITLE  = {"red": 0.18, "green": 0.34, "blue": 0.55}   # 濃い青
+    C_SEC    = {"red": 0.23, "green": 0.47, "blue": 0.71}   # 中青
+    C_YELLOW = {"red": 1.0,  "green": 0.95, "blue": 0.8}    # 薄い黄
+    C_BLUE   = {"red": 0.84, "green": 0.92, "blue": 1.0}    # 薄い青
+    C_GREEN  = {"red": 0.85, "green": 1.0,  "blue": 0.88}   # 薄い緑
+    C_GRAY   = {"red": 0.93, "green": 0.93, "blue": 0.93}   # グレー
+    C_WHITE  = {"red": 1.0,  "green": 1.0,  "blue": 1.0}
+
+    rows = [
+        # タイトル
+        ["📊 Wantedly Analytics  |  シートの見方", "", "", "", "", ""],
+        ["", "", "", "", "", ""],
+
+        # 概要
+        ["▌ このスプレッドシートについて", "", "", "", "", ""],
+        ["Wantedly の募集・ストーリー記事の閲覧数・応募数を毎朝9時に自動で取得し記録しています。", "", "", "", "", ""],
+        ["データは前日比の日別数値と累計数値の両方を確認できます。", "", "", "", "", ""],
+        ["", "", "", "", "", ""],
+
+        # タブ説明ヘッダー
+        ["▌ タブの使い方", "", "", "", "", ""],
+        ["タブ名", "こんなときに使う", "確認頻度", "ポイント", "", ""],
+
+        # 各タブ
+        ["📊 今日の動向",
+         "昨日と比べて、どの記事が伸びたか確認したいとき",
+         "毎日",
+         "日別PVが緑ハイライト。上から「募集中 → ストーリー → 募集停止中」の順に並んでいます。", "", ""],
+
+        ["📈 記事別推移",
+         "記事ごとに日々の数値がどう変化したか流れを見たいとき",
+         "週1〜2回",
+         "左3列（種別・タイトル・状態）は固定。日付は右にスクロールすると過去分も見られます。", "", ""],
+
+        ["サマリー",
+         "全記事の累計PV・累計応募数のランキングを見たいとき",
+         "月1回程度",
+         "累計値なので日々の変化は見えません。全体の規模感を把握するのに使います。", "", ""],
+
+        ["📋 日別データ",
+         "データをエクスポートしたり、独自に集計・分析したいとき",
+         "必要なとき",
+         "全データが縦持ち形式で蓄積されています。ピボットテーブルの元データとしても使えます。", "", ""],
+
+        ["", "", "", "", "", ""],
+
+        # 色の凡例
+        ["▌ 色の意味", "", "", "", "", ""],
+        ["　", "募集中の記事", "", "", "", ""],
+        ["　", "ストーリー記事", "", "", "", ""],
+        ["　", "募集停止中の記事", "", "", "", ""],
+        ["　", "日別PVに動きがあった行（今日の動向のみ）", "", "", "", ""],
+        ["", "", "", "", "", ""],
+
+        # 更新・運用
+        ["▌ 更新について", "", "", "", "", ""],
+        ["更新タイミング", "毎朝 9:00 に自動実行（Mac が起動していること）", "", "", "", ""],
+        ["手動実行",       "ターミナルで   uv run python scraper.py   を実行", "", "", "", ""],
+        ["セッション切れ", "ターミナルで   uv run python login.py   を実行してログインし直す", "", "", "", ""],
+    ]
+
+    ws.update("A1", rows, value_input_option="USER_ENTERED")
+
+    reqs = []
+    sid = ws.id
+
+    # タイトル行
+    reqs.append(_fmt_req(sid, 0, 1, 0, 6, bg=C_TITLE, bold=True, fg=C_WHITE))
+    # セクション見出し行
+    for ri in [2, 6, 13, 18]:
+        reqs.append(_fmt_req(sid, ri, ri + 1, 0, 6, bg=C_SEC, bold=True, fg=C_WHITE))
+    # テーブルヘッダー
+    reqs.append(_fmt_req(sid, 7, 8, 0, 4, bg=C_TITLE, bold=True, fg=C_WHITE, halign="CENTER"))
+    # 各タブ行の色
+    tab_colors = [C_BLUE, C_BLUE, C_GRAY, C_GRAY]
+    for i, color in enumerate(tab_colors):
+        reqs.append(_fmt_req(sid, 8 + i, 9 + i, 0, 4, bg=color))
+    # 色凡例
+    reqs.append(_fmt_req(sid, 14, 15, 0, 2, bg=C_BLUE))
+    reqs.append(_fmt_req(sid, 15, 16, 0, 2, bg=C_GREEN))
+    reqs.append(_fmt_req(sid, 16, 17, 0, 2, bg=C_GRAY))
+    reqs.append(_fmt_req(sid, 17, 18, 0, 2, bg={"red": 0.7, "green": 0.9, "blue": 0.7}))
+    # 更新セクション行
+    for ri in [19, 20, 21]:
+        reqs.append(_fmt_req(sid, ri, ri + 1, 0, 1, bold=True))
+
+    # 列幅
+    reqs += [
+        _col_width(sid, 0, 1, 160),
+        _col_width(sid, 1, 2, 380),
+        _col_width(sid, 2, 3, 100),
+        _col_width(sid, 3, 4, 400),
+    ]
+
+    # 行の高さをタイトル行だけ大きく
+    reqs.append({"updateDimensionProperties": {
+        "range": {"sheetId": sid, "dimension": "ROWS", "startIndex": 0, "endIndex": 1},
+        "properties": {"pixelSize": 40},
+        "fields": "pixelSize",
+    }})
+
+    if reqs:
+        ss.batch_update({"requests": reqs})
+
+    print("  使い方ガイド更新")
+
+
 def delete_unused_sheets(ss: Spreadsheet) -> None:
     """不要なタブを削除する"""
     to_delete = ["PV推移", "応募推移", "PVグラフ", "応募グラフ"]

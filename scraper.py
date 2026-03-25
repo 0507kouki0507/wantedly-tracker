@@ -244,6 +244,9 @@ def main() -> None:
     # 日別サマリー（見やすいダッシュボードタブ）
     sheets.update_daily_summary(ss, daily_records, today)
 
+    # 使い方ガイド
+    sheets.update_guide_sheet(ss)
+
     # 不要タブを削除
     sheets.delete_unused_sheets(ss)
 
