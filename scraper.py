@@ -147,7 +147,10 @@ def main() -> None:
 
     print("スプレッドシートを準備中...")
     ss = sheets.get_spreadsheet()
-    today = datetime.now().strftime("%Y-%m-%d")
+    _DOW = ["月", "火", "水", "木", "金", "土", "日"]
+    _now = datetime.now()
+    today = _now.strftime("%Y/%m/%d") + f"（{_DOW[_now.weekday()]}）"
+    today_key = _now.strftime("%Y-%m-%d")  # ピボット重複チェック用
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -231,12 +234,12 @@ def main() -> None:
 
     # PVピボット（日付×記事）
     pv_data = {r["title"][:40]: r["pv"] for r in records}
-    sheets.update_pivot(ss, "PV推移", today, pv_data, top_n=30)
+    sheets.update_pivot(ss, "PV推移", today_key, pv_data, top_n=30)
 
     # 応募数ピボット（募集のみ）
     oubo_data = {r["title"][:40]: r["oubo"]
                  for r in records if r["article_type"] == "募集"}
-    sheets.update_pivot(ss, "応募推移", today, oubo_data, top_n=30)
+    sheets.update_pivot(ss, "応募推移", today_key, oubo_data, top_n=30)
 
     # 縦持ち日別データ（全履歴・ピボット用）
     sheets.update_tall_data(ss, daily_records, today)
