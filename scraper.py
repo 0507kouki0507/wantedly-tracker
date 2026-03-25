@@ -234,22 +234,14 @@ def main() -> None:
 
     # PVピボット（日付×記事）
     pv_data = {r["title"][:40]: r["pv"] for r in records}
-    sheets.update_pivot(ss, "PV推移", today_key, pv_data, top_n=30)
-
-    # 応募数ピボット（募集のみ）
-    oubo_data = {r["title"][:40]: r["oubo"]
-                 for r in records if r["article_type"] == "募集"}
-    sheets.update_pivot(ss, "応募推移", today_key, oubo_data, top_n=30)
-
     # 縦持ち日別データ（全履歴・ピボット用）
     sheets.update_tall_data(ss, daily_records, today)
 
     # 日別サマリー（見やすいダッシュボードタブ）
     sheets.update_daily_summary(ss, daily_records, today)
 
-    # チャート（初回のみ作成）
-    sheets.create_chart_if_needed(ss, "PV推移",   "PVグラフ",   "PV推移グラフ（上位30記事）")
-    sheets.create_chart_if_needed(ss, "応募推移", "応募グラフ", "応募数推移グラフ（上位30記事）")
+    # 不要タブを削除
+    sheets.delete_unused_sheets(ss)
 
     conn.close()
     print(f"\n完了: {ss.url}")

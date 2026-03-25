@@ -49,13 +49,24 @@ SUMMARY_HEADERS = [
 ]
 
 
+def _status_order(r: dict) -> int:
+    """ソート優先度: 募集中 > ストーリー > 募集停止中"""
+    if r.get("status") == "募集中":
+        return 0
+    elif r.get("article_type") == "ストーリー":
+        return 1
+    return 2
+
+
 def update_summary(ss: Spreadsheet, records: list[dict]) -> None:
     """サマリーシートを最新データで全書き換えする"""
     ws = _get_or_add_ws(ss, "サマリー", rows=500, cols=15)
     ws.clear()
 
+    sorted_records = sorted(records, key=lambda x: (_status_order(x), -x["pv"]))
+
     rows = [SUMMARY_HEADERS]
-    for r in sorted(records, key=lambda x: -x["pv"]):
+    for r in sorted_records:
         rows.append([
             r["article_type"],
             r["title"],
@@ -74,20 +85,22 @@ def update_summary(ss: Spreadsheet, records: list[dict]) -> None:
     # ── 書式設定 ──────────────────────────
     reqs = []
     sheet_id = ws.id
-    n = len(rows)
 
     # ヘッダー行
     reqs.append(_fmt_req(sheet_id, 0, 1, 0, len(SUMMARY_HEADERS),
                          bg=COLOR_HEADER, bold=True, fg=COLOR_WHITE, halign="CENTER"))
     # 行ごとに色付け
-    for i, r in enumerate(records, start=1):
+    for i, r in enumerate(sorted_records, start=1):
         if r.get("status") == "募集停止中":
             bg = COLOR_STOPPED
+            fg = {"red": 0.6, "green": 0.6, "blue": 0.6}
         elif r["article_type"] == "ストーリー":
             bg = COLOR_STORY
+            fg = None
         else:
             bg = COLOR_BOSHU
-        reqs.append(_fmt_req(sheet_id, i, i + 1, 0, len(SUMMARY_HEADERS), bg=bg))
+            fg = None
+        reqs.append(_fmt_req(sheet_id, i, i + 1, 0, len(SUMMARY_HEADERS), bg=bg, fg=fg))
 
     # 列幅調整
     reqs += [
@@ -192,7 +205,7 @@ def update_daily_summary(ss: Spreadsheet, records: list[dict], date_str: str) ->
     rows.append([f"📅 {date_str}  |  Wantedly 日別動向レポート", "", "", "", "", "", ""])
     rows.append(DAILY_HEADERS)
 
-    sorted_records = sorted(records, key=lambda x: -x["daily_pv"])
+    sorted_records = sorted(records, key=lambda x: (_status_order(x), -x["daily_pv"]))
     for r in sorted_records:
         metric = r["daily_oubo"] if r["article_type"] == "募集" else r["daily_likes"]
         cumulative_metric = r["oubo"] if r["article_type"] == "募集" else r["likes"]
@@ -384,6 +397,18 @@ def create_chart_if_needed(ss: Spreadsheet, pivot_sheet_name: str,
 # ══════════════════════════════════════════
 #  ユーティリティ
 # ══════════════════════════════════════════
+
+def delete_unused_sheets(ss: Spreadsheet) -> None:
+    """不要なタブを削除する"""
+    to_delete = ["PV推移", "応募推移", "PVグラフ", "応募グラフ"]
+    for name in to_delete:
+        try:
+            ws = ss.worksheet(name)
+            ss.del_worksheet(ws)
+            print(f"  シート削除: {name}")
+        except gspread.WorksheetNotFound:
+            pass
+
 
 def _fmt_req(sheet_id: int, r1: int, r2: int, c1: int, c2: int,
              bg=None, bold: bool = False, fg=None,
