@@ -111,6 +111,68 @@ def update_summary(ss: Spreadsheet, records: list[dict]) -> None:
 
 
 # ══════════════════════════════════════════
+#  日別データシート（縦持ち・全履歴）
+# ══════════════════════════════════════════
+
+TALL_HEADERS = [
+    "日付", "種別", "タイトル", "状態",
+    "日別PV", "日別応募", "日別いいね",
+    "累計PV", "累計応募", "累計いいね",
+]
+
+
+def update_tall_data(ss: Spreadsheet, records: list[dict], date_str: str) -> None:
+    """縦持ち日別データシートに当日分を追記する"""
+    ws = _get_or_add_ws(ss, "📋 日別データ", rows=10000, cols=12)
+
+    existing = ws.get_all_values()
+
+    # 初回：ヘッダー作成 + 書式
+    if not existing or not existing[0]:
+        ws.update("A1", [TALL_HEADERS], value_input_option="USER_ENTERED")
+        reqs = [
+            _fmt_req(ws.id, 0, 1, 0, len(TALL_HEADERS),
+                     bg=COLOR_HEADER, bold=True, fg=COLOR_WHITE, halign="CENTER"),
+            _col_width(ws.id, 0, 1, 100),   # 日付
+            _col_width(ws.id, 1, 2, 90),    # 種別
+            _col_width(ws.id, 2, 3, 320),   # タイトル
+            _col_width(ws.id, 3, 4, 90),    # 状態
+            {"updateSheetProperties": {
+                "properties": {"sheetId": ws.id,
+                                "gridProperties": {"frozenRowCount": 1}},
+                "fields": "gridProperties.frozenRowCount",
+            }},
+        ]
+        ss.batch_update({"requests": reqs})
+        existing = [TALL_HEADERS]
+
+    # 既存日付チェック（同日重複防止）
+    existing_dates = {r[0] for r in existing[1:] if r}
+    if date_str in existing_dates:
+        print(f"  日別データ: {date_str} は既に記録済みです")
+        return
+
+    # 追記する行を作成
+    rows = []
+    for r in sorted(records, key=lambda x: -x["daily_pv"]):
+        rows.append([
+            date_str,
+            r["article_type"],
+            r["title"],
+            r.get("status", ""),
+            r["daily_pv"],
+            r["daily_oubo"],
+            r["daily_likes"],
+            r["pv"],
+            r["oubo"],
+            r["likes"],
+        ])
+
+    ws.append_rows(rows, value_input_option="USER_ENTERED")
+    print(f"  日別データ追記: {date_str} / {len(rows)} 件")
+
+
+# ══════════════════════════════════════════
 #  日別サマリーシート（見やすいダッシュボード）
 # ══════════════════════════════════════════
 

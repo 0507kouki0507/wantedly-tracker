@@ -238,6 +238,9 @@ def main() -> None:
                  for r in records if r["article_type"] == "募集"}
     sheets.update_pivot(ss, "応募推移", today, oubo_data, top_n=30)
 
+    # 縦持ち日別データ（全履歴・ピボット用）
+    sheets.update_tall_data(ss, daily_records, today)
+
     # 日別サマリー（見やすいダッシュボードタブ）
     sheets.update_daily_summary(ss, daily_records, today)
 
