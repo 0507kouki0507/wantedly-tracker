@@ -7,7 +7,6 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
-from google.oauth2.service_account import Credentials
 import gspread
 
 st.set_page_config(
@@ -30,13 +29,11 @@ def get_client():
     if "gcp_credentials" in st.secrets:
         import json
         creds_dict = json.loads(st.secrets["gcp_credentials"])
-        creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+        return gspread.service_account_from_dict(creds_dict, scopes=SCOPES)
     else:
-        # ローカル実行時は credentials.json を使用
         from pathlib import Path
         creds_path = Path(__file__).parent / "credentials.json"
-        creds = Credentials.from_service_account_file(str(creds_path), scopes=SCOPES)
-    return gspread.authorize(creds)
+        return gspread.service_account(filename=str(creds_path), scopes=SCOPES)
 
 
 @st.cache_data(ttl=300)
